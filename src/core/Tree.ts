@@ -88,6 +88,7 @@ export class Tree {
     return longerThanOne.length === 0
   }
 
+  // TODO: Should be written for multiple packages too? Usually there is an array of initialPackages
   allDependenciesFor(initialPackage: Package) {
     const initialNode = this.nodeForPackage(initialPackage)
 
@@ -118,6 +119,32 @@ export class Tree {
     }
 
     return dependencies
+  }
+
+  topologicalSort(ns: Node[]) {
+
+    const result: Node[][] = []
+
+    const ignoreList: Node[] = []
+
+    while (ignoreList.length < ns.length) {
+
+      const todo = ns.filter((n) => ignoreList.indexOf(n) === -1)
+
+      const leaves = todo.filter((n) => {
+        return n.edgesOut.filter((e) => ignoreList.indexOf(e.to!) === -1).length === 0
+      })
+
+      if (leaves.length === 0) {
+        throw `Dependency cycle detected? Could not resolve ${todo.map((n) => n.id).join(', ')}`
+      }
+
+      ignoreList.push(...leaves)
+
+      result.push(leaves)
+    }
+
+    return result.flat()
   }
 
   /**
