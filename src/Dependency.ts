@@ -27,6 +27,10 @@ export class Dependency {
     return ps.filter((p) => p.version === ms).at(0)
   }
 
+  allSatisfyingPackages(packages: Package[]) {
+    return packages.filter((p) => p.name === this.name).filter((p) => satisfies(p.version, this.versionRange.range))
+  }
+
   intersectsDependency(d: Dependency) {
     return intersects(this.versionRange.range, d.versionRange.range)
   }

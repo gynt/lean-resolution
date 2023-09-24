@@ -37,6 +37,10 @@ export class Tree {
     return Object.values(this.nodes)
   }
 
+  get packages() {
+    return this.nodeObjects.map((n) => n.spec)
+  }
+
   nodeForID(id: string) {
     return this.nodes[id]
   }
@@ -211,7 +215,7 @@ export class Tree {
     return result.flat()
   }
 
-  fix(node: Node, strategy: 'overlap') {
+  fixStrategyOverlap(node: Node) {
     let deps = this.allDependenciesForNode(node)
 
     let conflicts = this.conflictingEdges(deps)
@@ -269,8 +273,8 @@ export class Tree {
       }
 
       if (!solved) {
-        throw Error(`Could not solve dependency ${nodeName}. Conflicting edges: ${conflictingEdges.map((e) => {
-          return e.spec.toString()
+        throw Error(`Could not solve dependency ${nodeName}. Conflicting packages required: ${conflictingEdges.map((e) => {
+          return `${e.spec.name}: ${e.spec.versionRange} (required by ${e.from.id})`
         }).join(', ')}`)
       }
 
@@ -280,6 +284,84 @@ export class Tree {
     }
 
     return deps
+  }
+
+  // TODO: not truly brute force
+  fixBruteForce(rootNode: Node) {
+
+    let deps = this.allDependenciesForNode(rootNode)
+
+    let conflicts = this.conflictingEdges(deps)
+
+    if (conflicts.length === 0) {
+      return this.topologicalSort(deps)
+    }
+
+    let node = rootNode
+
+    let solved = false
+
+    let solution: Node[] | undefined
+
+    const forEachNode = (node: Node) => {
+
+      if (solved === true) {
+        return solution
+      }
+
+      deps = this.allDependenciesForNode(rootNode)
+      conflicts = this.conflictingEdges(deps)
+
+      if (conflicts.length === 0) {
+        solution = this.topologicalSort(deps)
+        solved = true
+        return this.topologicalSort(deps)
+      }
+
+      const packageOptionsForEachEdge = node.edgesOut.map((e) => {
+        const r = e.spec.allSatisfyingPackages(this.packages)
+        r.sort((a, b) => {
+          return rcompare(a.version, b.version)
+        })
+
+        return r
+      })
+
+      node.edgesOut.forEach((e, index) => {
+        packageOptionsForEachEdge[index].forEach((p) => {
+          const n = this.nodeForPackage(p)
+
+          const oldN = this.clearTargetForEdge(e)
+          this.setTargetForEdge(e, n)
+
+          forEachNode(n)
+
+          this.clearTargetForEdge(e)
+          this.setTargetForEdge(e, oldN)
+
+        })
+      })
+    }
+
+    forEachNode(rootNode)
+
+    if (solved) {
+      return solution!
+    }
+
+    throw Error(`Could not solve`)
+
+  }
+
+  fix(node: Node, strategy: 'overlap' | 'bruteforce') {
+    switch (strategy) {
+      case 'overlap': {
+        return this.fixStrategyOverlap(node)
+      }
+      case 'bruteforce': {
+        return this.fixBruteForce(node)
+      }
+    }
   }
 
   fixPackage(initialPackage: Package, strategy: 'overlap') {
