@@ -3,6 +3,11 @@ import { Repository } from "../Repository";
 import { Edge } from "./Edge";
 import { Node } from "./Node";
 
+export type DependencyCollection = {
+  initiator: Node,
+  dependencies: Node[]
+}
+
 export class Tree {
 
   nodes: { [name: string]: Node }
@@ -66,6 +71,53 @@ export class Tree {
     }
 
     return n
+  }
+
+  isValidSelection(nodes: Node[]) {
+    const nodeNames: { [name: string]: Node[] } = {}
+    nodes.forEach((n) => {
+      if (nodeNames[n.spec.name] === undefined) {
+        nodeNames[n.spec.name] = []
+      }
+
+      nodeNames[n.spec.name].push(n)
+    })
+
+    const longerThanOne = Object.entries(nodeNames).filter(([name, nodes]) => nodes.length > 1)
+
+    return longerThanOne.length === 0
+  }
+
+  allDependenciesFor(initialPackage: Package) {
+    const initialNode = this.nodeForPackage(initialPackage)
+
+    const dependencies: Node[] = []
+
+    const todo = [initialNode]
+    const visited: Node[] = []
+
+    while (todo.length > 0) {
+      const n = todo.splice(0, 1)[0]
+
+      if (dependencies.indexOf(n) === -1) {
+        dependencies.push(n)
+      }
+
+      n.out.forEach((e) => {
+        if (!e.resolved) {
+          throw `${e.spec.toString()} was not resolved`
+        }
+
+        const target = e.to!
+
+        if (visited.indexOf(target) === -1) {
+          todo.push(target)
+        }
+
+      })
+    }
+
+    return dependencies
   }
 
   /**
