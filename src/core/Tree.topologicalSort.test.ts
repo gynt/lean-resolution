@@ -29,7 +29,7 @@ describe('Tree topological sort', () => {
   let tree: Tree = Tree.buildInitialTree(repository)
   const initialPackage = repository.at(-1)!
 
-  const deps = tree.allDependenciesFor(initialPackage)
+  const deps = tree.allDependenciesForPackage(initialPackage)
 
   test('selection validity', () => {
 

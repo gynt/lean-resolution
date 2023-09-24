@@ -56,7 +56,7 @@ describe('Tree.buildInitialTree', () => {
 
     expect(tree).toBeTruthy()
 
-    dc = tree!.allDependenciesFor(initialPackage)
+    dc = tree!.allDependenciesForPackage(initialPackage)
 
     expect(dc.length).toBe(3)
   })

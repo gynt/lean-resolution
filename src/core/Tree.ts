@@ -3,6 +3,7 @@ import { Package } from "../Package";
 import { Repository } from "../Repository";
 import { Edge } from "./Edge";
 import { Node } from "./Node";
+import { Dependency } from "../Dependency";
 
 export type DependencyCollection = {
   initiator: Node,
@@ -150,9 +151,7 @@ export class Tree {
   }
 
   // TODO: Should be written for multiple packages too? Usually there is an array of initialPackages
-  allDependenciesFor(initialPackage: Package) {
-    const initialNode = this.nodeForPackage(initialPackage)
-
+  allDependenciesForNode(initialNode: Node) {
     const dependencies: Node[] = []
 
     const todo = [initialNode]
@@ -182,6 +181,10 @@ export class Tree {
     return dependencies
   }
 
+  allDependenciesForPackage(p: Package) {
+    return this.allDependenciesForNode(this.nodeForPackage(p))
+  }
+
   topologicalSort(ns: Node[]) {
 
     const result: Node[][] = []
@@ -197,7 +200,7 @@ export class Tree {
       })
 
       if (leaves.length === 0) {
-        throw `Dependency cycle detected? Could not resolve ${todo.map((n) => n.id).join(', ')}`
+        throw `Are all required packages included? Dependency cycle detected? Could not resolve ${todo.map((n) => n.id).join(', ')}`
       }
 
       ignoreList.push(...leaves)
@@ -208,9 +211,8 @@ export class Tree {
     return result.flat()
   }
 
-  fix(initialPackage: Package, strategy: 'overlap') {
-
-    let deps = this.allDependenciesFor(initialPackage)
+  fix(node: Node, strategy: 'overlap') {
+    let deps = this.allDependenciesForNode(node)
 
     let conflicts = this.conflictingEdges(deps)
 
@@ -254,7 +256,10 @@ export class Tree {
         if (validity.length === validity.filter((v) => v === true).length) {
 
           // Set this candidate!
-          conflictingEdges.forEach((e) => e.to = candidate)
+          conflictingEdges.forEach((e) => {
+            if (e.to !== undefined) this.clearTargetForEdge(e)
+            this.setTargetForEdge(e, candidate)
+          })
 
           solved = true
 
@@ -270,11 +275,58 @@ export class Tree {
       }
 
       // This is to refresh everything because the node selections have changed!
-      deps = this.allDependenciesFor(initialPackage)
+      deps = this.allDependenciesForNode(node)
       conflicts = this.conflictingEdges(deps)
     }
 
     return deps
+  }
+
+  fixPackage(initialPackage: Package, strategy: 'overlap') {
+    return this.fix(this.nodeForPackage(initialPackage), strategy)
+  }
+
+  setInitialTargetForEdge(e: Edge) {
+    const p = e.spec.maxSatisfyingPackage(this.nodeObjects.map((n) => n.spec))
+
+    if (p === undefined) {
+      this.state = 'ERROR'
+      this.errors.push(`No valid package found for dependency: ${e.spec.toString()} (required by ${e.from.id})`)
+
+      return
+    }
+
+    this.setTargetForEdge(e, this.nodeForPackage(p))
+  }
+
+  solve(packages: Package[]) {
+
+    const nodes = packages.map((p) => this.nodeForPackage(p))
+
+    // packages could interdepent, so start with the bottom one first
+    const deps = Array.from(new Set(nodes.map((n) => this.allDependenciesForNode(n)).flat()))
+    const ns = this.topologicalSort(deps).filter((n) => nodes.indexOf(n) !== -1)
+
+    const fictitiousNode = new Node(new Package('__user__', '0.0.0', ns.map((n) => {
+      return new Dependency(n.spec.name, `=${n.spec.version.raw}`)
+    })))
+
+    fictitiousNode.edgesOut.forEach((e) => this.setInitialTargetForEdge(e))
+
+    const all = this.allDependenciesForNode(fictitiousNode)
+
+    if (this.isValidSelection(all)) {
+      return this.topologicalSort(all)
+    }
+
+    const all2 = this.fix(fictitiousNode, 'overlap')
+
+    if (!this.isValidSelection(all2)) {
+      this.state = "ERROR"
+      this.errors.push(`Could not fix dependency issues: ${fictitiousNode.edgesOut.map((e) => e.spec.toString()).join(', ')}`)
+    }
+
+    return this.topologicalSort(all2.filter((n) => n !== fictitiousNode))
   }
 
   /**
@@ -289,16 +341,7 @@ export class Tree {
 
     tree.nodeObjects.forEach((n) => {
       n.edgesOut.forEach((e) => {
-        const p = e.spec.maxSatisfyingPackage(repository)
-
-        if (p === undefined) {
-          tree.state = 'ERROR'
-          tree.errors.push(`No valid package found for dependency: ${e.spec.toString()} (required by ${e.from.id})`)
-
-          return
-        }
-
-        tree.setTargetForEdge(e, tree.nodeForPackage(p))
+        tree.setInitialTargetForEdge(e)
 
       })
     })
