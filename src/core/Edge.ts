@@ -15,4 +15,20 @@ export class Edge {
   get resolved() {
     return this.to !== undefined
   }
+
+  isValidTarget(n: Node) {
+    return this.spec.isSatisfiedBy(n.spec)
+  }
+
+  /**
+   * Invalid in the general sense
+   * 
+   * @param n 
+   */
+  isConflicting(n: Node) {
+    // Attention: this might seem odd, but it leads to a nice filter logic?
+    if (n.spec.name !== this.spec.name) return true;
+
+    return !this.spec.isSatisfiedBy(n.spec)
+  }
 }
