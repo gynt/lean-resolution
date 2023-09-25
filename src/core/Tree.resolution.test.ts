@@ -181,5 +181,5 @@ describe('Impossible problems', () => {
     }).toThrowError('Could not solve dependency A. Conflicting packages required: A: >=0.0.2 (required by C@0.0.3), A: 0.0.1 (required by B@0.0.3)')
   })
 
-  const solution = tree.fixBruteForce(tree.nodeForID(packageIds[0]))
+  // const solution = tree.fixBruteForce(tree.nodeForID(packageIds[0]))
 })

@@ -12,6 +12,10 @@ export class Edge {
     this.to = to;
   }
 
+  get id() {
+    return `${this.from.spec.id}: ${this.spec.name} ${this.spec.versionRange}`
+  }
+
   get resolved() {
     return this.to !== undefined
   }

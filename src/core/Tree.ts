@@ -10,9 +10,14 @@ export type DependencyCollection = {
   dependencies: Node[]
 }
 
-export type NodeConflict = {
+export type EdgeConflict = {
   nodeName: string,
   edges: Edge[]
+}
+
+export type NodeConflict = {
+  nodeName: string,
+  nodes: Node[]
 }
 
 export class Tree {
@@ -39,6 +44,10 @@ export class Tree {
 
   get packages() {
     return this.nodeObjects.map((n) => n.spec)
+  }
+
+  get edges() {
+    return this.nodeObjects.map((n) => n.edgesOut).flat()
   }
 
   nodeForID(id: string) {
@@ -118,6 +127,7 @@ export class Tree {
     )
 
     const sortedNames: string[] = []
+    // topological sort assumes a resolved tree (logically)...
     this.topologicalSort(nodes).forEach((n) => {
       if (sortedNames.indexOf(n.spec.name) === -1) {
         sortedNames.push(n.spec.name)
@@ -130,12 +140,12 @@ export class Tree {
       return {
         nodeName: n,
         edges: conflicts[n]
-      } as NodeConflict
+      } as EdgeConflict
     })
 
   }
 
-  conflictingPackages(nodes: Node[]) {
+  conflictingPackages(nodes: Node[]): NodeConflict[] {
     const nodeNames: { [name: string]: Node[] } = {}
     nodes.forEach((n) => {
       if (nodeNames[n.spec.name] === undefined) {
@@ -147,7 +157,12 @@ export class Tree {
 
     const longerThanOne = Object.entries(nodeNames).filter(([name, nodes]) => nodes.length > 1)
 
-    return longerThanOne
+    return longerThanOne.map(([name, nodes]) => {
+      return {
+        nodeName: name,
+        nodes
+      } as NodeConflict
+    })
   }
 
   isValidSelection(nodes: Node[]) {
@@ -155,7 +170,10 @@ export class Tree {
   }
 
   // TODO: Should be written for multiple packages too? Usually there is an array of initialPackages
-  allDependenciesForNode(initialNode: Node) {
+  allDependenciesForNode(initialNode: Node, options?: { allowUnresolvedEdges: boolean}) {
+
+    options = (options || {allowUnresolvedEdges: false})
+
     const dependencies: Node[] = []
 
     const todo = [initialNode]
@@ -169,11 +187,19 @@ export class Tree {
       }
 
       n.out.forEach((e) => {
-        if (!e.resolved) {
-          throw `${e.spec.toString()} was not resolved`
-        }
 
-        const target = e.to!
+        const target = e.to
+
+        // This can happen if Edge e wasn't resolved yet.
+        // here we allow it.
+        if (target === undefined) {
+          if (!options!.allowUnresolvedEdges) {
+            throw Error(`Encountered unresolved edge: ${e.id}`)
+          }
+
+          // If allowed, we just "continue" with the next edge
+          return
+        }
 
         if (visited.indexOf(target) === -1) {
           todo.push(target)
@@ -421,13 +447,26 @@ export class Tree {
   static buildInitialTree(repository: Repository): Tree {
     const tree = new Tree(repository)
 
-    tree.nodeObjects.forEach((n) => {
-      n.edgesOut.forEach((e) => {
-        tree.setInitialTargetForEdge(e)
-
-      })
-    })
+    tree.setInitialTargetForAllEdges()
 
     return tree;
+  }
+
+  setInitialTargetForAllEdges() {
+    this.nodeObjects.forEach((n) => {
+      n.edgesOut.forEach((e) => {
+        this.setInitialTargetForEdge(e)
+      })
+    })
+  }
+
+  reset() {
+    this.nodeObjects.forEach((n) => {
+      n.edgesOut.forEach((e) => {
+        if (e.to !== undefined) {
+          this.clearTargetForEdge(e)
+        }
+      })
+    })
   }
 }
