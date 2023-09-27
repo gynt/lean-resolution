@@ -4,6 +4,8 @@ import { Repository } from "../Repository";
 import { Edge } from "./Edge";
 import { Node } from "./Node";
 import { Dependency } from "../Dependency";
+import { SimpleConflictSolver } from "./algorithms/SimpleConflictSolver";
+import { BruteforceAlgorithm } from "./algorithms/Bruteforce";
 
 export type DependencyCollection = {
   initiator: Node,
@@ -19,6 +21,8 @@ export type NodeConflict = {
   nodeName: string,
   nodes: Node[]
 }
+
+export type ResolutionStrategy = 'simple' | 'bruteforce'
 
 export class Tree {
 
@@ -170,9 +174,9 @@ export class Tree {
   }
 
   // TODO: Should be written for multiple packages too? Usually there is an array of initialPackages
-  allDependenciesForNode(initialNode: Node, options?: { allowUnresolvedEdges: boolean}) {
+  allDependenciesForNode(initialNode: Node, options?: { allowUnresolvedEdges: boolean }) {
 
-    options = (options || {allowUnresolvedEdges: false})
+    options = (options || { allowUnresolvedEdges: false })
 
     const dependencies: Node[] = []
 
@@ -241,156 +245,20 @@ export class Tree {
     return result.flat()
   }
 
-  fixStrategyOverlap(node: Node) {
-    let deps = this.allDependenciesForNode(node)
-
-    let conflicts = this.conflictingEdges(deps)
-
-    const initialConflictCount = conflicts.length
-
-    // This can produce an infinite loop,
-    // TODO: improve by moving down a topological sort!
-    // Or by ensuring the conflict count does not go up...
-    while (conflicts.length > 0) {
-
-      if (conflicts.length > initialConflictCount) {
-        const msg = `Infinite loop prevented. More conflicts caused (${conflicts.length}) than solved ${initialConflictCount}!`
-
-        this.state = "ERROR"
-        this.errors.push()
-        throw Error(msg)
-      }
-
-      const conflict = conflicts[0]
-
-      const conflictingEdges = conflict.edges
-
-      const nodeName = conflictingEdges[0].spec.name
-
-      const candidates = this.nodeObjects.filter((n) => {
-        return n.spec.name == nodeName
-      })
-
-      candidates.sort((a, b) => {
-        return rcompare(a.spec.version, b.spec.version)
-      })
-
-      let solved = false
-
-      while (candidates.length > 0) {
-
-        const candidate = candidates.splice(0, 1)[0]
-
-        const validity = conflictingEdges.map((e) => e.isValidTarget(candidate))
-
-        if (validity.length === validity.filter((v) => v === true).length) {
-
-          // Set this candidate!
-          conflictingEdges.forEach((e) => {
-            if (e.to !== undefined) this.clearTargetForEdge(e)
-            this.setTargetForEdge(e, candidate)
-          })
-
-          solved = true
-
-          break
-        }
-
-      }
-
-      if (!solved) {
-        throw Error(`Could not solve dependency ${nodeName}. Conflicting packages required: ${conflictingEdges.map((e) => {
-          return `${e.spec.name}: ${e.spec.versionRange} (required by ${e.from.id})`
-        }).join(', ')}`)
-      }
-
-      // This is to refresh everything because the node selections have changed!
-      deps = this.allDependenciesForNode(node)
-      conflicts = this.conflictingEdges(deps)
-    }
-
-    return deps
-  }
-
-  // TODO: not truly brute force
-  fixBruteForce(rootNode: Node) {
-
-    let deps = this.allDependenciesForNode(rootNode)
-
-    let conflicts = this.conflictingEdges(deps)
-
-    if (conflicts.length === 0) {
-      return this.topologicalSort(deps)
-    }
-
-    let node = rootNode
-
-    let solved = false
-
-    let solution: Node[] | undefined
-
-    const forEachNode = (node: Node) => {
-
-      if (solved === true) {
-        return solution
-      }
-
-      deps = this.allDependenciesForNode(rootNode)
-      conflicts = this.conflictingEdges(deps)
-
-      if (conflicts.length === 0) {
-        solution = this.topologicalSort(deps)
-        solved = true
-        return this.topologicalSort(deps)
-      }
-
-      const packageOptionsForEachEdge = node.edgesOut.map((e) => {
-        const r = e.spec.allSatisfyingPackages(this.packages)
-        r.sort((a, b) => {
-          return rcompare(a.version, b.version)
-        })
-
-        return r
-      })
-
-      node.edgesOut.forEach((e, index) => {
-        packageOptionsForEachEdge[index].forEach((p) => {
-          const n = this.nodeForPackage(p)
-
-          const oldN = this.clearTargetForEdge(e)
-          this.setTargetForEdge(e, n)
-
-          forEachNode(n)
-
-          this.clearTargetForEdge(e)
-          this.setTargetForEdge(e, oldN)
-
-        })
-      })
-    }
-
-    forEachNode(rootNode)
-
-    if (solved) {
-      return solution!
-    }
-
-    throw Error(`Could not solve`)
-
-  }
-
-  fix(node: Node, strategy: 'overlap' | 'bruteforce') {
+  fix(node: Node, strategy: ResolutionStrategy) {
     switch (strategy) {
-      case 'overlap': {
-        return this.fixStrategyOverlap(node)
+      case 'simple': {
+        return new SimpleConflictSolver(this, node).solve()
       }
       case 'bruteforce': {
-        return this.fixBruteForce(node)
+        return new BruteforceAlgorithm(this, node).solve()
       }
+      default:
+        throw Error(`unknown strategy: ${strategy}`)
     }
   }
 
-  fixPackage(initialPackage: Package, strategy: 'overlap') {
+  fixPackage(initialPackage: Package, strategy: ResolutionStrategy) {
     return this.fix(this.nodeForPackage(initialPackage), strategy)
   }
 
@@ -405,9 +273,37 @@ export class Tree {
     }
 
     this.setTargetForEdge(e, this.nodeForPackage(p))
+
   }
 
-  solve(packages: Package[]) {
+  solveForNode(rootNode: Node, strategies?: ResolutionStrategy[]) {
+    strategies = strategies || ['simple', 'bruteforce']
+
+    rootNode.edgesOut.forEach((e) => this.setInitialTargetForEdge(e))
+
+    let solution = this.allDependenciesForNode(rootNode)
+
+    if (this.isValidSelection(solution)) {
+      return this.topologicalSort(solution).filter((n) => n !== rootNode)
+    }
+
+    for (const strategy of strategies) {
+      solution = this.fix(rootNode, strategy)
+
+      if (this.isValidSelection(solution)) {
+        return this.topologicalSort(solution).filter((n) => n !== rootNode)
+      }
+    }
+
+    const msg = `Could not fix dependency issues: ${rootNode.edgesOut.map((e) => e.spec.toString()).join(', ')}`
+    this.state = "ERROR"
+    this.errors.push(msg)
+
+    throw Error(msg)
+  }
+
+  solve(packages: Package[], strategies?: ResolutionStrategy[]) {
+    strategies = strategies || ['simple', 'bruteforce']
 
     const nodes = packages.map((p) => this.nodeForPackage(p))
 
@@ -419,22 +315,7 @@ export class Tree {
       return new Dependency(n.spec.name, `=${n.spec.version.raw}`)
     })))
 
-    fictitiousNode.edgesOut.forEach((e) => this.setInitialTargetForEdge(e))
-
-    const all = this.allDependenciesForNode(fictitiousNode)
-
-    if (this.isValidSelection(all)) {
-      return this.topologicalSort(all)
-    }
-
-    const all2 = this.fix(fictitiousNode, 'overlap')
-
-    if (!this.isValidSelection(all2)) {
-      this.state = "ERROR"
-      this.errors.push(`Could not fix dependency issues: ${fictitiousNode.edgesOut.map((e) => e.spec.toString()).join(', ')}`)
-    }
-
-    return this.topologicalSort(all2.filter((n) => n !== fictitiousNode))
+    return this.solveForNode(fictitiousNode, strategies)
   }
 
   /**

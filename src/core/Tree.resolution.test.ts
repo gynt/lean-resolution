@@ -81,7 +81,7 @@ describe('Tree resolution: ==', () => {
   let deps = tree.allDependenciesForPackage(initialPackage)
 
   if (!tree.isValidSelection(deps)) {
-    deps = tree.fixPackage(initialPackage, 'overlap')
+    deps = tree.fixPackage(initialPackage, 'simple')
   }
 
   test('sorting', () => {
@@ -135,7 +135,7 @@ describe('Fictitious node: ==', () => {
 })
 
 
-describe('Impossible problems', () => {
+describe('Hard problems', () => {
 
   const repoYaml = `
   A@0.0.1: {}
@@ -176,6 +176,12 @@ describe('Impossible problems', () => {
   // and tries them one by one (highest version first).
   // That sounds expensive!
   test('solving', () => {
+    expect(() => {
+      tree.solve(packageIds.map((pid) => tree.nodeForID(pid).spec))
+    }).toThrowError('Could not solve dependency A. Conflicting packages required: A: >=0.0.2 (required by C@0.0.3), A: 0.0.1 (required by B@0.0.3)')
+  })
+
+  test('bruteforce', () => {
     expect(() => {
       tree.solve(packageIds.map((pid) => tree.nodeForID(pid).spec))
     }).toThrowError('Could not solve dependency A. Conflicting packages required: A: >=0.0.2 (required by C@0.0.3), A: 0.0.1 (required by B@0.0.3)')
