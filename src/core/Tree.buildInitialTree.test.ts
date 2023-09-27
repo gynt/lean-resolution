@@ -65,6 +65,6 @@ describe('Tree.buildInitialTree', () => {
 
     expect(dc!).toBeTruthy()
 
-    expect(tree!.isValidSelection(dc!)).toBe(true)
+    expect(tree!.isValidSolution(dc!)).toBe(true)
   })
 });

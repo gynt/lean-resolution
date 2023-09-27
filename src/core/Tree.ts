@@ -169,7 +169,7 @@ export class Tree {
     })
   }
 
-  isValidSelection(nodes: Node[]) {
+  isValidSolution(nodes: Node[]) {
     return this.conflictingPackages(nodes).length === 0
   }
 
@@ -283,14 +283,14 @@ export class Tree {
 
     let solution = this.allDependenciesForNode(rootNode)
 
-    if (this.isValidSelection(solution)) {
+    if (this.isValidSolution(solution)) {
       return this.topologicalSort(solution).filter((n) => n !== rootNode)
     }
 
     for (const strategy of strategies) {
       solution = this.fix(rootNode, strategy)
 
-      if (this.isValidSelection(solution)) {
+      if (this.isValidSolution(solution)) {
         return this.topologicalSort(solution).filter((n) => n !== rootNode)
       }
     }

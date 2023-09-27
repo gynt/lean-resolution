@@ -34,7 +34,7 @@ describe('Tree resolution: >=', () => {
   const deps = tree.allDependenciesForPackage(repository.at(-1)!)
 
   test('selection validity', () => {
-    expect(tree.isValidSelection(deps)).toBe(true)
+    expect(tree.isValidSolution(deps)).toBe(true)
   })
 
   test('sorting', () => {
@@ -80,7 +80,7 @@ describe('Tree resolution: ==', () => {
 
   let deps = tree.allDependenciesForPackage(initialPackage)
 
-  if (!tree.isValidSelection(deps)) {
+  if (!tree.isValidSolution(deps)) {
     deps = tree.fixPackage(initialPackage, 'simple')
   }
 

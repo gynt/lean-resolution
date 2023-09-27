@@ -33,7 +33,7 @@ describe('Tree topological sort', () => {
 
   test('selection validity', () => {
 
-    const isValid = tree.isValidSelection(deps)
+    const isValid = tree.isValidSolution(deps)
 
     expect(isValid).toBe(true)
 
