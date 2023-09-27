@@ -284,14 +284,14 @@ export class Tree {
     let solution = this.allDependenciesForNode(rootNode)
 
     if (this.isValidSolution(solution)) {
-      return this.topologicalSort(solution).filter((n) => n !== rootNode)
+      return this.topologicalSort(solution)
     }
 
     for (const strategy of strategies) {
       solution = this.fix(rootNode, strategy)
 
       if (this.isValidSolution(solution)) {
-        return this.topologicalSort(solution).filter((n) => n !== rootNode)
+        return this.topologicalSort(solution)
       }
     }
 
@@ -315,7 +315,7 @@ export class Tree {
       return new Dependency(n.spec.name, `=${n.spec.version.raw}`)
     })))
 
-    return this.solveForNode(fictitiousNode, strategies)
+    return this.solveForNode(fictitiousNode, strategies).filter((n) => n !== fictitiousNode)
   }
 
   /**
