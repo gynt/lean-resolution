@@ -305,6 +305,8 @@ export class Tree {
   solve(packages: Package[], strategies?: ResolutionStrategy[]) {
     strategies = strategies || ['simple', 'bruteforce']
 
+    this.setInitialTargetForAllEdges()
+
     const nodes = packages.map((p) => this.nodeForPackage(p))
 
     // packages could interdepent, so start with the bottom one first
