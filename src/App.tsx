@@ -11,6 +11,20 @@ import { repositoryFromYaml, solve } from 'lean-resolution';
 const rawContentAtom = atom<string>(`A@0.0.1: {}
 B@0.0.1:
   A: "=0.0.1"
+B@0.0.2:
+  A: "=0.0.1"
+B@0.0.3:
+  A: ">=0.0.1"
+C@0.0.1:
+  B: "=0.0.1"
+C@0.0.2:
+  B: "=0.0.2"
+C@0.0.3:
+  B: "=0.0.1"
+D@0.0.1:
+  B: "=0.0.2"
+  C: ">=0.0.2" 
+  
 `);
 
 type ParseResult = {
