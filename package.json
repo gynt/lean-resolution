@@ -11,11 +11,17 @@
     "@types/node": "^16.18.55",
     "@types/react": "^18.2.24",
     "@types/react-dom": "^18.2.8",
+    "bootstrap": "^5.3.2",
+    "jotai": "^2.4.3",
+    "lean-resolution": "github:gynt/lean-resolution",
     "react": "^18.2.0",
+    "react-bootstrap": "^2.9.0",
+    "react-bootstrap-icons": "^1.10.3",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
     "typescript": "^4.9.5",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "yaml": "^2.3.2"
   },
   "scripts": {
     "predeploy": "npm run build",
