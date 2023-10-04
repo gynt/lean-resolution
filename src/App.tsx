@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-import logo from './logo.svg';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import { Container, Form } from 'react-bootstrap';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { parse, stringify } from 'yaml';
-import { repositoryFromYaml, solve } from 'lean-resolution';
+import { solve } from 'lean-resolution';
 
 const rawContentAtom = atom<string>(`A@0.0.1: {}
 B@0.0.1:
