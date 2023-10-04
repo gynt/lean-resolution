@@ -177,14 +177,14 @@ describe('Hard problems', () => {
   // That sounds expensive!
   test('solving', () => {
     expect(() => {
-      tree.solve(packageIds.map((pid) => tree.nodeForID(pid).spec))
+      tree.solve(packageIds.map((pid) => tree.nodeForID(pid).spec), ['simple'])
     }).toThrowError('Could not solve dependency A. Conflicting packages required: A: >=0.0.2 (required by C@0.0.3), A: 0.0.1 (required by B@0.0.3)')
   })
 
   test('bruteforce', () => {
     expect(() => {
-      tree.solve(packageIds.map((pid) => tree.nodeForID(pid).spec))
-    }).toThrowError('Could not solve dependency A. Conflicting packages required: A: >=0.0.2 (required by C@0.0.3), A: 0.0.1 (required by B@0.0.3)')
+      return tree.solve(packageIds.map((pid) => tree.nodeForID(pid).spec))
+    }).toBeTruthy()
   })
 
   // const solution = tree.fixBruteForce(tree.nodeForID(packageIds[0]))

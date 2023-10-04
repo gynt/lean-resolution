@@ -28,6 +28,8 @@ export class SimpleConflictSolver {
 
     this.tree.setInitialTargetForAllEdges()
 
+    this.rootNode.edgesOut.filter((e) => e.to === undefined || e.to === null).forEach((e) => this.tree.setInitialTargetForEdge(e))
+
     let deps = this.tree.allDependenciesForNode(this.rootNode)
 
     let conflicts = this.tree.conflictingEdges(deps)

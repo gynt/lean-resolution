@@ -279,23 +279,20 @@ export class Tree {
   solveForNode(rootNode: Node, strategies?: ResolutionStrategy[]) {
     strategies = strategies || ['simple', 'bruteforce']
 
-    rootNode.edgesOut.forEach((e) => this.setInitialTargetForEdge(e))
-
-    let solution = this.allDependenciesForNode(rootNode)
-
-    if (this.isValidSolution(solution)) {
-      return this.topologicalSort(solution)
-    }
-
     for (const strategy of strategies) {
-      solution = this.fix(rootNode, strategy)
+      try {
+        const solution = this.fix(rootNode, strategy)
 
-      if (this.isValidSolution(solution)) {
-        return this.topologicalSort(solution)
+        if (this.isValidSolution(solution)) {
+          return this.topologicalSort(solution)
+        }
+      } catch (e) {
+        this.errors.push((e as Error).toString());
       }
+
     }
 
-    const msg = `Could not fix dependency issues: ${rootNode.edgesOut.map((e) => e.spec.toString()).join(', ')}`
+    const msg = `Could not fix dependency issues: ${rootNode.edgesOut.map((e) => e.spec.toString()).join(', ')}\n\t${this.errors.join('\n\t')}`
     this.state = "ERROR"
     this.errors.push(msg)
 
@@ -305,16 +302,8 @@ export class Tree {
   solve(packages: Package[], strategies?: ResolutionStrategy[]) {
     strategies = strategies || ['simple', 'bruteforce']
 
-    this.setInitialTargetForAllEdges()
-
-    const nodes = packages.map((p) => this.nodeForPackage(p))
-
-    // packages could interdepent, so start with the bottom one first
-    const deps = Array.from(new Set(nodes.map((n) => this.allDependenciesForNode(n)).flat()))
-    const ns = this.topologicalSort(deps).filter((n) => nodes.indexOf(n) !== -1)
-
-    const fictitiousNode = new Node(new Package('__user__', '0.0.0', ns.map((n) => {
-      return new Dependency(n.spec.name, `=${n.spec.version.raw}`)
+    const fictitiousNode = new Node(new Package('__user__', '0.0.0', packages.map((n) => {
+      return new Dependency(n.name, `=${n.version.raw}`)
     })))
 
     return this.solveForNode(fictitiousNode, strategies).filter((n) => n !== fictitiousNode)
